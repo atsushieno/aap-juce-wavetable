@@ -255,3 +255,258 @@ index 88ccc3b23c..89f06fb38d 100644
  
      ConstantsStack constants;
      std::map<juce::String, juce::var> macros;
+diff --git a/modules/gin/modules/gin_plugin/components/gin_patchbrowser.cpp b/modules/gin/modules/gin_plugin/components/gin_patchbrowser.cpp
+index b9db9235b7..9138665082 100644
+--- a/modules/gin/modules/gin_plugin/components/gin_patchbrowser.cpp
++++ b/modules/gin/modules/gin_plugin/components/gin_patchbrowser.cpp
+@@ -177,9 +177,13 @@ void PatchBrowser::deletePreset (int row)
+     auto p = proc.getProgram (currentPresets[row]);
+     if (p == nullptr)
+         return;
+-    
++
++   #if JUCE_ANDROID
++    // AAP: PluginAlertWindow crashes without an Activity inside AudioPluginViewService.
++    return;
++   #else
+     auto ed = findParentComponentOfClass<ProcessorEditor>();
+-    
++
+     auto w = std::make_shared<gin::PluginAlertWindow> ("Delete preset '" + p->name + "'?", "", juce::AlertWindow::NoIcon, getParentComponent());
+     w->addButton ("Yes", 1, juce::KeyPress (juce::KeyPress::returnKey));
+     w->addButton ("No", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+@@ -191,6 +195,7 @@ void PatchBrowser::deletePreset (int row)
+         if (r == 1)
+             proc.deleteProgram (proc.getPrograms().indexOf (p));
+     });
++   #endif
+ }
+ 
+ void PatchBrowser::editPreset (int row)
+@@ -198,9 +203,12 @@ void PatchBrowser::editPreset (int row)
+     auto p = proc.getProgram (currentPresets[row]);
+     if (p == nullptr)
+         return;
+-    
++
++   #if JUCE_ANDROID
++    return;
++   #else
+     auto ed = findParentComponentOfClass<ProcessorEditor>();
+-    
++
+     auto w = std::make_shared<gin::PluginAlertWindow> ("Edit preset:", "", juce::AlertWindow::NoIcon, getParentComponent());
+     w->setLookAndFeel (&getLookAndFeel());
+     w->addTextEditor ("name", p->name, "Name:");
+@@ -244,6 +252,7 @@ void PatchBrowser::editPreset (int row)
+             }
+         }
+     });
++   #endif
+ }
+ 
+ PatchBrowser::AuthorsModel::AuthorsModel (PatchBrowser& o)
+@@ -387,8 +396,13 @@ void PatchBrowser::PresetsModel::listBoxItemClicked (int row, const juce::MouseE
+    #else
+     m.addItem ("Show file...", [f] { f.revealToUser(); });
+    #endif
+-    
+-    m.showMenuAsync ({});
++
++    juce::PopupMenu::Options opts;
++   #if JUCE_ANDROID
++    if (auto* ed = owner.findParentComponentOfClass<ProcessorEditor>())
++        opts = opts.withParentComponent (ed);
++   #endif
++    m.showMenuAsync (opts);
+ }
+ 
+ 
+diff --git a/modules/gin/modules/gin_plugin/components/gin_plugineditor.cpp b/modules/gin/modules/gin_plugin/components/gin_plugineditor.cpp
+index 1970966c82..a0901c870f 100644
+--- a/modules/gin/modules/gin_plugin/components/gin_plugineditor.cpp
++++ b/modules/gin/modules/gin_plugin/components/gin_plugineditor.cpp
+@@ -229,6 +229,10 @@ TitleBar::TitleBar (ProcessorEditor& e, Processor& p, PatchBrowser& pb)
+         }
+         
+         auto opts = juce::PopupMenu::Options().withTargetComponent (programName).withDeletionCheck (programName);
++       #if JUCE_ANDROID
++        if (auto* ed = findParentComponentOfClass<ProcessorEditor>())
++            opts = opts.withParentComponent (ed);
++       #endif
+         m.showMenuAsync (opts, [&] (int) { menuShowing = false; } );
+     };
+ 
+@@ -269,12 +273,18 @@ TitleBar::TitleBar (ProcessorEditor& e, Processor& p, PatchBrowser& pb)
+     };
+     addButton.onClick = [this]
+     {
++       #if JUCE_ANDROID
++        // AAP: PluginAlertWindow uses juce::AlertWindow which adds itself to the
++        // desktop on construction; inside AudioPluginViewService there is no
++        // Activity, so that crashes. Skip the dialog on Android.
++        return;
++       #else
+         Program* prog = nullptr;
+-        
++
+         int progIdx = slProc.getCurrentProgram();
+         if (progIdx > 0)
+             prog = slProc.getPrograms()[progIdx];
+-        
++
+         auto w = std::make_shared<gin::PluginAlertWindow> ("Create preset:", "", juce::AlertWindow::NoIcon, getParentComponent());
+         w->setLookAndFeel (slProc.processorOptions.lookAndFeel.get());
+         w->addTextEditor ("name", prog != nullptr ? prog->name : juce::String(), "Name:");
+@@ -321,9 +331,13 @@ TitleBar::TitleBar (ProcessorEditor& e, Processor& p, PatchBrowser& pb)
+                 }
+             }
+         });
++       #endif
+     };
+     deleteButton.onClick = [this]
+     {
++       #if JUCE_ANDROID
++        return;
++       #else
+         auto w = std::make_shared<gin::PluginAlertWindow> ("Delete preset '" + slProc.getProgramName (programs.getSelectedItemIndex()) + "'?", "", juce::AlertWindow::NoIcon, getParentComponent());
+         w->addButton ("Yes", 1, juce::KeyPress (juce::KeyPress::returnKey));
+         w->addButton ("No", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+@@ -338,10 +352,17 @@ TitleBar::TitleBar (ProcessorEditor& e, Processor& p, PatchBrowser& pb)
+                 refreshPrograms();
+             }
+         });
++       #endif
+     };
+     infoButton.onClick = [this]
+     {
++       #if JUCE_ANDROID
++        // AAP: About dialog path goes through juce::AlertWindow which crashes
++        // without an Activity.
++        return;
++       #else
+         editor.showAboutInfo();
++       #endif
+     };
+     menuButton.onClick = [this]
+     {
+@@ -534,6 +555,9 @@ void TitleBar::showMenu()
+     });
+ 
+     m.addSeparator();
++   #if ! JUCE_ANDROID
++    // AAP: juce::FileChooser::launchAsync requires an Activity on Android,
++    // which isn't available inside AudioPluginViewService.
+     if (slProc.midiLearn != nullptr)
+     {
+         m.addItem ("Load MIDI Map...", [this]
+@@ -573,11 +597,17 @@ void TitleBar::showMenu()
+                 });
+         });
+     }
++   #endif
+ 
+     editor.addMenuItems (m);
+ 
+     m.setLookAndFeel ( &getLookAndFeel());
+-    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (menuButton));
++    auto opts = juce::PopupMenu::Options().withTargetComponent (menuButton).withDeletionCheck (menuButton);
++   #if JUCE_ANDROID
++    if (auto* ed = findParentComponentOfClass<ProcessorEditor>())
++        opts = opts.withParentComponent (ed);
++   #endif
++    m.showMenuAsync (opts);
+ }
+ 
+ void TitleBar::comboBoxChanged (juce::ComboBox* c)
+@@ -787,6 +817,11 @@ void ProcessorEditor::showAboutInfo()
+     msg += "Copyright ";
+     msg += juce::String (&__DATE__[7]);
+ 
++   #if JUCE_ANDROID
++    // AAP: juce::AlertWindow adds itself to the desktop on construction;
++    // inside AudioPluginViewService there is no Activity, so skip it.
++    juce::ignoreUnused (msg);
++   #else
+     auto w = std::make_shared<gin::PluginAlertWindow> ("---- About ----", msg, juce::AlertWindow::NoIcon, this);
+     w->addButton ("OK", 1, juce::KeyPress (juce::KeyPress::returnKey));
+     w->setLookAndFeel (slProc.processorOptions.lookAndFeel.get());
+@@ -795,6 +830,7 @@ void ProcessorEditor::showAboutInfo()
+     {
+         w->setVisible (false);
+     });
++   #endif
+ }
+ 
+ void ProcessorEditor::refreshProgramsList()
+diff --git a/plugin/Source/Panels.h b/plugin/Source/Panels.h
+index 30c91ab..1f1458c 100644
+--- a/plugin/Source/Panels.h
++++ b/plugin/Source/Panels.h
+@@ -50,6 +50,11 @@ public:
+         addControl (addButton);
+         addButton->onClick = [this]
+         {
++           #if JUCE_ANDROID
++            // AAP: juce::FileChooser::launchAsync requires an Activity, which
++            // isn't available inside AudioPluginViewService.
++            return;
++           #else
+             auto chooser = std::make_shared<juce::FileChooser> (juce::String ("Load Wavetable"), juce::File(), juce::String ("*.wav"));
+ 
+             auto chooserFlags = juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::openMode;
+@@ -61,6 +66,7 @@ public:
+ 
+                 loadUserWavetable (f);
+             } );
++           #endif
+         };
+ 
+         timer.startTimerHz (60);
+@@ -90,6 +96,10 @@ public:
+         auto sz = gin::getWavetableSize (f);
+         if (sz <= 0)
+         {
++           #if JUCE_ANDROID
++            // AAP: PluginAlertWindow crashes without an Activity in AudioPluginViewService.
++            proc.loadUserWavetable (idx, f, 2048);
++           #else
+             auto w = std::make_shared<gin::PluginAlertWindow> ("Import Wavetable", "Wav file does not contain Wavetable metadata. What is the wavetable size?", juce::AlertWindow::NoIcon, getParentComponent());
+             w->setLookAndFeel (proc.processorOptions.lookAndFeel.get());
+             w->addComboBox ("size", { "256", "512", "1024", "2048" }, "Samples per table:");
+@@ -106,6 +116,7 @@ public:
+                 if (ret == 1)
+                     proc.loadUserWavetable (idx, f, userSize);
+             });
++           #endif
+         }
+         else
+         {
+@@ -180,7 +191,12 @@ public:
+             for (auto itr : menus)
+                 m.addSubMenu (itr.first, itr.second);
+ 
+-            m.showMenuAsync ({});
++            juce::PopupMenu::Options opts;
++           #if JUCE_ANDROID
++            if (auto* ed = findParentComponentOfClass<gin::ProcessorEditor>())
++                opts = opts.withParentComponent (ed);
++           #endif
++            m.showMenuAsync (opts);
+         }
+     }
+ 
+@@ -787,7 +803,12 @@ public:
+                 proc.fxParams.distMode->setUserValue (3.0f);
+             });
+ 
+-            m.showMenuAsync ({});
++            juce::PopupMenu::Options opts;
++           #if JUCE_ANDROID
++            if (auto* ed = findParentComponentOfClass<gin::ProcessorEditor>())
++                opts = opts.withParentComponent (ed);
++           #endif
++            m.showMenuAsync (opts);
+         };
+ 
+         watchParam (proc.fxParams.distMode);
