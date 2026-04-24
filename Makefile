@@ -22,7 +22,8 @@ JUCE_PATCHES= \
 	$(AAP_JUCE_DIR)/juce-patches/8.0.12/support-plugin-ui.patch \
 	$(AAP_JUCE_DIR)/juce-patches/8.0.12/embedded-peer-window-guard.patch \
 	$(AAP_JUCE_DIR)/juce-patches/8.0.12/juce-component-peer-view-touch.patch \
-	$(AAP_JUCE_DIR)/juce-patches/8.0.12/popup-menu-android.patch
+	$(AAP_JUCE_DIR)/juce-patches/8.0.12/popup-menu-android.patch \
+	$(AAP_JUCE_DIR)/juce-patches/8.0.12/standalone-aap-factory-weak-fallback.patch
 
 JUCE_PATCH_DEPTH=1
 

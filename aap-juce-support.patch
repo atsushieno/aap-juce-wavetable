@@ -1,0 +1,257 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 52f0a96..51ea011 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -40,8 +40,8 @@ set (CMAKE_OBJCXX_STANDARD 20)
+ set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
+ set (CMAKE_CXX_VISIBILITY_PRESET hidden)
+ set (CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+-set (CMAKE_MINSIZEREL_POSTFIX -rm)
+-set (CMAKE_RELWITHDEBINFO_POSTFIX -rd)
++#set (CMAKE_MINSIZEREL_POSTFIX -rm)
++#set (CMAKE_RELWITHDEBINFO_POSTFIX -rd)
+ set (CMAKE_OPTIMIZE_DEPENDENCIES OFF)
+ 
+ set (BUILD_SHARED_LIBS OFF)
+@@ -183,6 +183,9 @@ target_include_directories (${PLUGIN_NAME} PRIVATE modules/fmt/include)
+ target_include_directories (${PLUGIN_NAME} PRIVATE modules/ASIO/common)
+ target_include_directories (${PLUGIN_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/Definitions)
+ 
++# this has to be placed before juce_generate_juce_header()...
++juce_add_modules(${AAP_JUCE_DIR}/aap-modules/aap_audio_processors)
++
+ juce_generate_juce_header (${PLUGIN_NAME})
+ 
+ target_compile_definitions (${PLUGIN_NAME} PRIVATE
+@@ -191,7 +194,7 @@ target_compile_definitions (${PLUGIN_NAME} PRIVATE
+ 								JUCE_MODAL_LOOPS_PERMITTED=0
+ 								JUCE_WEB_BROWSER=0
+ 								JUCE_USE_FLAC=1
+-								JUCE_USE_CURL=1
++								#JUCE_USE_CURL=1
+ 								JUCE_USE_MP3AUDIOFORMAT=0
+ 								JUCE_USE_LAME_AUDIO_FORMAT=0
+ 								JUCE_USE_WINDOWS_MEDIA_FORMAT=0
+@@ -237,7 +240,7 @@ if (WIN32)
+ 	endforeach()
+ endif()
+ 
+-if(UNIX AND NOT APPLE)
++if(UNIX AND NOT APPLE AND NOT ANDROID)
+ 	target_link_libraries (${PLUGIN_NAME} PRIVATE curl)
+ endif()
+ 
+@@ -249,3 +252,49 @@ else()
+ endif()
+ 
+ install (TARGETS ${PLUGIN_NAME} DESTINATION "${dest}")
++
++# begin AAP specifics -->
++
++# They are needed in desktop too, for generate-aap-metadata.
++target_include_directories(${PLUGIN_NAME} PUBLIC
++		"${AAP_DIR}/include"
++		"${AAP_JUCE_DIR}/aap-modules"
++)
++
++target_compile_definitions(${PLUGIN_NAME} PUBLIC
++		JUCEAAP_HAVE_AUDIO_PLAYHEAD_NEW_POSITION_INFO=1
++		JUCE_PUSH_NOTIFICATIONS=1
++		JUCE_PUSH_NOTIFICATIONS_ACTIVITY="com/rmsl/juce/JuceActivity"
++)
++
++message("AAP_DIR: ${AAP_DIR}")
++message("AAP_JUCE_DIR: ${AAP_JUCE_DIR}")
++
++if (ANDROID)
++	find_library(log "log")
++	find_library(android "android")
++	find_library(glesv2 "GLESv2")
++	find_library(egl "EGL")
++	#set(cpufeatures_lib "cpufeatures")
++	#set(oboe_lib "oboe")
++
++	target_include_directories(${PLUGIN_NAME} PRIVATE
++			"${ANDROID_NDK}/sources/android/cpufeatures"
++			#"${OBOE_DIR}/include"
++	)
++
++	add_compile_definitions(
++			[[JUCE_ANDROID=1]]
++			[[JUCE_DONT_AUTO_OPEN_MIDI_DEVICES_ON_MOBILE=1]]
++	)
++
++	find_package(androidaudioplugin REQUIRED CONFIG)
++	target_link_libraries(${PLUGIN_NAME} PRIVATE
++			androidaudioplugin::androidaudioplugin
++			aap_audio_processors
++	)
++endif (ANDROID)
++
++target_link_libraries(${PLUGIN_NAME} PRIVATE aap_audio_processors)
++
++# <-- end AAP specifics
+Submodule modules/gin contains modified content
+diff --git a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp b/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp
+index 994d668685..4ede7f92ed 100644
+--- a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp
++++ b/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp
+@@ -325,22 +325,22 @@ LayoutSupport::LayoutSupport (juce::Component& parent_, std::function<std::pair<
+ 
+     if (refCount == 0)
+     {
+-        watcher = std::make_unique<FileSystemWatcher>();
+-        watcher->coalesceEvents (100);
++        //watcher = std::make_unique<FileSystemWatcher>();
++        //watcher->coalesceEvents (100);
+     }
+ 
+     refCount++;
+ 
+-    watcher->addListener (this);
++    //watcher->addListener (this);
+ }
+ 
+ LayoutSupport::~LayoutSupport()
+ {
+-    watcher->removeListener (this);
++    //watcher->removeListener (this);
+ 
+     refCount--;
+     if (refCount == 0)
+-        watcher = nullptr;
++        ;//watcher = nullptr;
+ }
+ 
+ bool LayoutSupport::isLayoutSet()
+@@ -420,7 +420,7 @@ void LayoutSupport::setLayout (const juce::Array<juce::File>& files)
+         layoutFiles.add (f);
+         contents.add ({ f.getFileName(), f.loadFileAsString() });
+ 
+-        watcher->addFolder (f.getParentDirectory());
++        //watcher->addFolder (f.getParentDirectory());
+     }
+ 
+     setLayoutInternal (contents);
+@@ -1156,61 +1156,62 @@ void LayoutSupport::setGridPositions (const juce::String& currentPath, const juc
+         ids = expandTokens ({ idString });
+ 
+     ids.trim ();
+-    
++
+     if (auto foundComp = compMap.findComponent (currentPath))
+     {
+         juce::ScopedValueSetter<juce::Component*> svs (curComponent, foundComp);
+-        
++
+         auto bounds = getBounds (0, component);
+-        
++
+         juce::Rectangle<int> rc (bounds.x, bounds.y, bounds.w, bounds.h);
+-        
++
+         using juce::operator""_px;
+         using juce::operator""_fr;
+-        
++
+         juce::Grid grid;
+-        
++
+         auto cols = parse (getPropertyWithDefault (component, kCols, 1), 0);
+         auto rows = parse (getPropertyWithDefault (component, kRows, 1), 0);
+-        
++
+         grid.columnGap  = juce::Grid::Px (parse (getPropertyWithDefault (component, kColGap, 0), 0));
+         grid.rowGap     = juce::Grid::Px (parse (getPropertyWithDefault (component, kRowGap, 0), 0));
+-        
++
+         auto getTrackInfo = [] (const juce::String& str, int idx)
+         {
+             auto tokens = juce::StringArray::fromTokens (str, "/", "");
+             tokens.trim();
+             auto token = tokens[idx + 1];
+-            
++
+             if (token.endsWith ("px"))
+                 return juce::Grid::TrackInfo (juce::Grid::Px (token.retainCharacters ("0123456789").getIntValue()));
+-            
++
+             if (token.endsWith ("fr"))
+                 return juce::Grid::TrackInfo (juce::Grid::Fr (token.retainCharacters ("0123456789").getIntValue()));
+-            
++
+             return juce::Grid::TrackInfo (1_fr);
+         };
+-        
++
+         for (auto i = 0; i < cols; i++)
+             grid.templateColumns.add (getTrackInfo (ids[i], 0));
+-        
++
+         for (auto i = 0; i < rows; i++)
+             grid.templateRows.add (getTrackInfo (ids[cols * i], 1));
+-        
++
+         for (auto id : ids)
+         {
+             const auto path = juce::String (currentPath) + "/" + id.upToFirstOccurrenceOf ("/", false, false).trim();
+-            
++
+             if (auto foundChildComp = compMap.findComponent (path))
+                 grid.items.add (juce::GridItem (foundChildComp));
+             else
+                 grid.items.add (juce::GridItem());
+         }
+-        
++
+         grid.performLayout (rc);
+     }
+ }
+ 
++/*
+ void LayoutSupport::fileChanged (const juce::File& f, gin::FileSystemWatcher::FileSystemEvent)
+ {
+     if (f.existsAsFile() && layoutFiles.contains (f))
+@@ -1228,6 +1229,7 @@ void LayoutSupport::fileChanged (const juce::File& f, gin::FileSystemWatcher::Fi
+         setLayoutInternal (contents);
+     }
+ }
++*/
+ 
+ int LayoutSupport::parse (const juce::var& equation, int equationIndex)
+ {
+diff --git a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.h b/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.h
+index 88ccc3b23c..89f06fb38d 100644
+--- a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.h
++++ b/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.h
+@@ -264,7 +264,7 @@ private:
+     }
+     @endcode
+ */
+-class LayoutSupport : private gin::FileSystemWatcher::Listener
++class LayoutSupport //: private gin::FileSystemWatcher::Listener
+ {
+ public:
+     /**
+@@ -277,7 +277,7 @@ public:
+     */
+     LayoutSupport (juce::Component& parent_, std::function<std::pair<juce::Component*, bool> (const juce::String&)> factory_ = nullptr);
+ 
+-    ~LayoutSupport() override;
++    ~LayoutSupport();// override;
+ 
+     /**
+         Generate JSON layout from existing component hierarchy.
+@@ -367,10 +367,10 @@ protected:
+     void setGridPositions (const juce::String& currentPath, const juce::var& component);
+ 
+     inline static int refCount = 0;
+-    inline static std::unique_ptr<FileSystemWatcher> watcher;
++    //inline static std::unique_ptr<FileSystemWatcher> watcher;
+ 
+     // gin::FileSystemWatcher::Listener
+-    void fileChanged (const juce::File&, gin::FileSystemWatcher::FileSystemEvent) override;
++    //void fileChanged (const juce::File&, gin::FileSystemWatcher::FileSystemEvent) override;
+ 
+     ConstantsStack constants;
+     std::map<juce::String, juce::var> macros;
