@@ -12,8 +12,8 @@ APP_SHARED_CODE_LIBS="$(APP_NAME)_artefacts/lib$(APP_NAME)_SharedCode.a"
 
 # Populate aap-juce-support.patch with upstream changes required for AAP,
 # then uncomment the following two lines to have `make` apply it automatically.
-#PATCH_FILE=$(PWD)/aap-juce-support.patch
-#PATCH_DEPTH=1
+PATCH_FILE=$(PWD)/aap-juce-support.patch
+PATCH_DEPTH=1
 
 # JUCE patches if any
 JUCE_PATCHES= \
