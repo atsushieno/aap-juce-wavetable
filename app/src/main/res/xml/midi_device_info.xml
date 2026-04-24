@@ -1,0 +1,5 @@
+<devices>
+    <device name="Wavetable" manufacturer="androidaudioplugin.org" product="Wavetable">
+        <input-port name="input" />
+    </device>
+</devices>

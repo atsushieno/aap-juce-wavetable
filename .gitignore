@@ -1,0 +1,10 @@
+local.properties
+.idea
+.cxx
+build
+.gradle
+dist
+.DS_Store
+
+.stamp-juce
+.stamp-app
