@@ -2,7 +2,7 @@
 
 <plugins xmlns="urn:org.androidaudioplugin.core">
   <plugin name="Wavetable AAP" category="Instrument"
-      developer="SocaLabs / AAP Porting Project" unique-id="juceaap:57617665" library="libWavetable_Standalone.so"
+      developer="SocaLabs" unique-id="juceaap:socalabs-wavetable" library="libWavetable_Standalone.so"
       entrypoint="GetJuceAAPFactoryStandalone"
       gui:ui-view-factory="org.androidaudioplugin.juce.JuceAudioPluginViewFactory"
       xmlns:gui="urn://androidaudioplugin.org/extensions/gui">
