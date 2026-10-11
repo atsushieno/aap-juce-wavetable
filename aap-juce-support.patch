@@ -1,8 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 52f0a96..51ea011 100644
+index 52f0a96..338a370 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -40,8 +40,8 @@ set (CMAKE_OBJCXX_STANDARD 20)
+@@ -1,4 +1,9 @@
+-cmake_minimum_required (VERSION 3.16.0 FATAL_ERROR)
++cmake_minimum_required(VERSION 3.22)
++
++get_filename_component(app_source "${CMAKE_CURRENT_LIST_DIR}" REALPATH)
++add_subdirectory("${app_source}/../aap-juce" "${CMAKE_CURRENT_BINARY_DIR}/aap-juce" EXCLUDE_FROM_ALL)
++aap_juce_configure(JUCE_SOURCE_DIR modules/juce ADOPT_EXISTING_PATCHES)
++
+ 
+ #
+ # Set for each plugin
+@@ -40,8 +45,8 @@ set (CMAKE_OBJCXX_STANDARD 20)
  set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
  set (CMAKE_CXX_VISIBILITY_PRESET hidden)
  set (CMAKE_VISIBILITY_INLINES_HIDDEN ON)
@@ -13,7 +24,7 @@ index 52f0a96..51ea011 100644
  set (CMAKE_OPTIMIZE_DEPENDENCIES OFF)
  
  set (BUILD_SHARED_LIBS OFF)
-@@ -183,6 +183,9 @@ target_include_directories (${PLUGIN_NAME} PRIVATE modules/fmt/include)
+@@ -183,6 +188,9 @@ target_include_directories (${PLUGIN_NAME} PRIVATE modules/fmt/include)
  target_include_directories (${PLUGIN_NAME} PRIVATE modules/ASIO/common)
  target_include_directories (${PLUGIN_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/Definitions)
  
@@ -23,7 +34,7 @@ index 52f0a96..51ea011 100644
  juce_generate_juce_header (${PLUGIN_NAME})
  
  target_compile_definitions (${PLUGIN_NAME} PRIVATE
-@@ -191,7 +194,7 @@ target_compile_definitions (${PLUGIN_NAME} PRIVATE
+@@ -191,7 +199,7 @@ target_compile_definitions (${PLUGIN_NAME} PRIVATE
  								JUCE_MODAL_LOOPS_PERMITTED=0
  								JUCE_WEB_BROWSER=0
  								JUCE_USE_FLAC=1
@@ -32,7 +43,7 @@ index 52f0a96..51ea011 100644
  								JUCE_USE_MP3AUDIOFORMAT=0
  								JUCE_USE_LAME_AUDIO_FORMAT=0
  								JUCE_USE_WINDOWS_MEDIA_FORMAT=0
-@@ -237,7 +240,7 @@ if (WIN32)
+@@ -237,7 +245,7 @@ if (WIN32)
  	endforeach()
  endif()
  
@@ -41,7 +52,7 @@ index 52f0a96..51ea011 100644
  	target_link_libraries (${PLUGIN_NAME} PRIVATE curl)
  endif()
  
-@@ -249,3 +252,49 @@ else()
+@@ -249,3 +257,49 @@ else()
  endif()
  
  install (TARGETS ${PLUGIN_NAME} DESTINATION "${dest}")
@@ -91,7 +102,6 @@ index 52f0a96..51ea011 100644
 +target_link_libraries(${PLUGIN_NAME} PRIVATE aap_audio_processors)
 +
 +# <-- end AAP specifics
-Submodule modules/gin contains modified content
 diff --git a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp b/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp
 index 994d668685..4ede7f92ed 100644
 --- a/modules/gin/modules/gin_gui/utilities/gin_layoutsupport.cpp
